@@ -47,6 +47,8 @@ open class Banner: UIView {
     private let contentView = UIView()
     private let labelView = UIView()
     private let backgroundView = UIView()
+
+    private var enableProgress: Bool = false
     
     /// How long the slide down animation should last.
     @objc open var animationDuration: TimeInterval = 0.4
@@ -157,9 +159,10 @@ open class Banner: UIView {
     /// - parameter image: The image on the left of the banner. Optional. Defaults to nil.
     /// - parameter backgroundColor: The color of the banner's background view. Defaults to `UIColor.blackColor()`.
     /// - parameter didTapBlock: An action to be called when the user taps on the banner. Optional. Defaults to `nil`.
-    @objc public required init(title: String? = nil, subtitle: String? = nil, image: UIImage? = nil, backgroundColor: UIColor = UIColor.black, didTapBlock: (() -> ())? = nil) {
+    @objc public required init(title: String? = nil, subtitle: String? = nil, image: UIImage? = nil, enableProgress: Bool = false, backgroundColor: UIColor = UIColor.black, didTapBlock: (() -> ())? = nil) {
         self.didTapBlock = didTapBlock
         self.image = image
+        self.enableProgress = enableProgress
         super.init(frame: CGRect.zero)
         resetShadows()
         addGestureRecognizers()
@@ -171,7 +174,7 @@ open class Banner: UIView {
         backgroundView.backgroundColor = backgroundColor
         backgroundView.alpha = 0.95
     }
-    
+
     private func forceUpdates() {
       guard let superview = superview, let showingConstraint = showingConstraint, let hiddenConstraint = hiddenConstraint else { return }
         switch bannerState {
@@ -235,10 +238,13 @@ open class Banner: UIView {
     private var minimumHeightConstraint: NSLayoutConstraint!
   
     private func initializeSubviews() {
+        let activityView = UIActivityIndicatorView(activityIndicatorStyle: .white)
+
         let views = [
             "backgroundView": backgroundView,
             "contentView": contentView,
             "imageView": imageView,
+            "activityView": activityView,
             "labelView": labelView,
             "titleLabel": titleLabel,
             "detailLabel": detailLabel
@@ -264,12 +270,26 @@ open class Banner: UIView {
         if image == nil {
             leftConstraintText = "|"
         } else {
-            contentView.addSubview(imageView)
-            contentView.addConstraint(imageView.constraintWithAttribute(.leading, .equal, to: contentView, constant: 15.0))
-            contentView.addConstraint(imageView.constraintWithAttribute(.centerY, .equal, to: contentView))
-            imageView.addConstraint(imageView.constraintWithAttribute(.width, .equal, to: 25.0))
-            imageView.addConstraint(imageView.constraintWithAttribute(.height, .equal, to: .width))
-            leftConstraintText = "[imageView]"
+            if (self.enableProgress == true) {
+                activityView.center = contentView.center
+                activityView.startAnimating()
+                
+                contentView.addConstraint(activityView.constraintWithAttribute(.leading, .equal, to: contentView, constant: 15.0))
+                contentView.addConstraint(activityView.constraintWithAttribute(.centerY, .equal, to: contentView))
+                
+                activityView.addConstraint(activityView.constraintWithAttribute(.width, .equal, to: 25.0))
+                activityView.addConstraint(activityView.constraintWithAttribute(.height, .equal, to: .width))
+                
+                contentView.addSubview(activityView)
+                leftConstraintText = "[activityView]"
+            } else {
+                contentView.addSubview(imageView)
+                contentView.addConstraint(imageView.constraintWithAttribute(.leading, .equal, to: contentView, constant: 15.0))
+                contentView.addConstraint(imageView.constraintWithAttribute(.centerY, .equal, to: contentView))
+                imageView.addConstraint(imageView.constraintWithAttribute(.width, .equal, to: 25.0))
+                imageView.addConstraint(imageView.constraintWithAttribute(.height, .equal, to: .width))
+                leftConstraintText = "[imageView]"
+            }
         }
         let constraintFormat = "H:\(leftConstraintText)-(15)-[labelView]-(8)-|"
         contentView.translatesAutoresizingMaskIntoConstraints = false
@@ -332,10 +352,14 @@ open class Banner: UIView {
     /// Shows the banner. If a view is specified, the banner will be displayed at the top of that view, otherwise at top of the top window. If a `duration` is specified, the banner dismisses itself automatically after that duration elapses.
     /// - parameter view: A view the banner will be shown in. Optional. Defaults to 'nil', which in turn means it will be shown in the top window. duration A time interval, after which the banner will dismiss itself. Optional. Defaults to `nil`.
     @objc public func show() {
-        show(nil, duration: 3.0)
+        show(nil, duration: 3)
     }
     
-    open func show(_ view: UIView? = nil, duration: TimeInterval? = nil) {
+    @objc public func show(duration: Int) {
+        show(nil, duration: duration)
+    }
+    
+    open func show(_ view: UIView? = nil, duration: Int? = 0) {
         let viewToUse = view ?? Banner.topWindow()
         guard let view = viewToUse else {
             print("[Banner]: Could not find view. Aborting.")
@@ -363,12 +387,27 @@ open class Banner: UIView {
             self.bannerState = .showing
             }, completion: { finished in
                 guard let duration = duration else { return }
-                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(Int(1000.0 * duration))) {
+                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(Int(1000 * duration))) {
                     self.dismiss(self.adjustsStatusBarStyle ? oldStatusBarStyle : nil)
                 }
         })
     }
-  
+
+    @objc open func dismiss() {
+        let (damping, velocity) = self.springiness.springValues
+        UIView.animate(withDuration: animationDuration, delay: 0.0, usingSpringWithDamping: damping, initialSpringVelocity: velocity, options: .allowUserInteraction, animations: {
+            self.bannerState = .hidden
+
+            //            let oldStatusBarStyle = oldStatusBarStyle {
+//                UIApplication.shared.setStatusBarStyle(oldStatusBarStyle, animated: true)
+//            }
+        }, completion: { finished in
+            self.bannerState = .gone
+            self.removeFromSuperview()
+            self.didDismissBlock?()
+        })
+    }
+    
     /// Dismisses the banner.
     open func dismiss(_ oldStatusBarStyle: UIStatusBarStyle? = nil) {
         let (damping, velocity) = self.springiness.springValues
