@@ -116,7 +116,7 @@ open class Banner: UIView {
     }
     
     /// The label that displays the banner's title.
-    @objc open let titleLabel: UILabel = {
+    @objc public let titleLabel: UILabel = {
         let label = UILabel()
         label.font = UIFont.preferredFont(forTextStyle: UIFont.TextStyle.headline)
         label.numberOfLines = 0
@@ -125,7 +125,7 @@ open class Banner: UIView {
         }()
     
     /// The label that displays the banner's subtitle.
-    @objc open let detailLabel: UILabel = {
+    @objc public let detailLabel: UILabel = {
         let label = UILabel()
         label.font = UIFont.preferredFont(forTextStyle: UIFont.TextStyle.subheadline)
         label.numberOfLines = 0
@@ -137,7 +137,7 @@ open class Banner: UIView {
     @objc let image: UIImage?
     
     /// The image view that displays the `image`.
-    @objc open let imageView: UIImageView = {
+    @objc public let imageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.contentMode = .scaleAspectFit
